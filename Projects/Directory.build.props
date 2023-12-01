@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <!-- Avoid the 'net8' sub-folders. -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <!-- Central output folder. -->
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</RepoRoot>
+    <ArtifactsDir>$([MSBuild]::NormalizeDirectory('$(RepoRoot)', '../Binaries'))</ArtifactsDir>
+    <ArtifactsObjDir>$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)', 'obj'))</ArtifactsObjDir>
+    <ArtifactsBinDir>$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)'))</ArtifactsBinDir>
+    <OutDirName>$(MSBuildProjectName)</OutDirName>
+    <OutputPath>$(ArtifactsDir)</OutputPath>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$([System.IO.Path]::GetFullPath('$(ArtifactsObjDir)$(OutDirName)\'))</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,7 @@
+**/.vs
+**/obj
+*.pdb
+*.exe
+*.runtimeconfig.json
+*.dll
+*.deps.json
