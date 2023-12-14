@@ -117,9 +117,45 @@ static class Program
         }
     }
 
+    private static void GenerateCombinations(Line data, int[] numbers, (int, int)[] ranges, HashSet<(int, int)> rangesFound, int index, int biggestRange)
+    {
+        if (index == numbers.Length)
+        {
+            data.FoundCombinations.Add(new HashSet<(int, int)>(rangesFound));
+            return;
+        }
+
+        for (int offset = 0; offset < biggestRange; ++offset)
+        {
+            ranges[index].Item1 += offset;
+            ranges[index].Item2 -= offset;
+
+            bool valid = true;
+
+            for (int i = 0; i < ranges.Length; ++i)
+            {
+                if (ranges[i].Item2 < 0)
+                {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (valid)
+            {
+                GenerateCombinations(data, numbers, ranges, rangesFound, index + 1, biggestRange);
+            }
+
+            ranges[index].Item1 -= offset;
+            ranges[index].Item2 += offset;
+        }
+    }
+
     public static void Main()
     {
         string[] lines = File.ReadAllLines(Path.Combine("..", "Input", "day12.txt"));
+
+        Stopwatch timer = Stopwatch.StartNew();
 
         // Parse data
         Line[] lineData = new Line[lines.Length];
@@ -176,7 +212,7 @@ static class Program
         // Find all combinations, ignoring the requirement of '#'.
 
         int remaining = lineData.Length;
-        Parallel.For(0, lineData.Length, i =>
+        for (int i = 0; i < lineData.Length; ++i)
         {
             ref Line data = ref lineData[i];
 
@@ -188,156 +224,16 @@ static class Program
                 biggestRange = Math.Max(range.Item2, biggestRange);
             }
 
-            // I've never created a nested loop this deep before.
-            // To be honest, I just couldn't nicely figure out how to test every combination,
-            // so I've written this awful mess because there's only 6 numbers max per line.
-            // Unsurprisingly it takes absolutely forever, but I've wasted enough hours on this as-is.
-            if (data.Numbers.Length == 6)
-            {
-                for (int j = 0; j < data.Numbers.Length; ++j)
-                {
-                    for (int m = 0; m < data.Numbers.Length; ++m)
-                    {
-                        for (int n = 0; n < data.Numbers.Length; ++n)
-                        {
-                            for (int o = 0; o < data.Numbers.Length; ++o)
-                            {
-                                for (int p = 0; p < data.Numbers.Length; ++p)
-                                {
-                                    for (int q = 0; q < data.Numbers.Length; ++q)
-                                    {
-                                        for (int k = 0; k < biggestRange; ++k)
-                                        {
-                                            for (int l = 0; l < biggestRange; ++l)
-                                            {
-                                                for (int r = 0; r < biggestRange; ++r)
-                                                {
-                                                    for (int s = 0; s < biggestRange; ++s)
-                                                    {
-                                                        for (int t = 0; t < biggestRange; ++t)
-                                                        {
-                                                            for (int u = 0; u < biggestRange; ++u)
-                                                            {
-                                                                RangeLookup(data, j, m, n, o, p, q, k, l, r, s, t, u);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else if (data.Numbers.Length == 5)
-            {
-                for (int j = 0; j < data.Numbers.Length; ++j)
-                {
-                    for (int m = 0; m < data.Numbers.Length; ++m)
-                    {
-                        for (int n = 0; n < data.Numbers.Length; ++n)
-                        {
-                            for (int o = 0; o < data.Numbers.Length; ++o)
-                            {
-                                for (int p = 0; p < data.Numbers.Length; ++p)
-                                {
-                                    for (int k = 0; k < biggestRange; ++k)
-                                    {
-                                        for (int l = 0; l < biggestRange; ++l)
-                                        {
-                                            for (int r = 0; r < biggestRange; ++r)
-                                            {
-                                                for (int s = 0; s < biggestRange; ++s)
-                                                {
-                                                    for (int t = 0; t < biggestRange; ++t)
-                                                    {
-                                                        RangeLookup(data, j, m, n, o, p, 255, k, l, r, s, t, 255);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else if (data.Numbers.Length == 4)
-            {
-                for (int j = 0; j < data.Numbers.Length; ++j)
-                {
-                    for (int m = 0; m < data.Numbers.Length; ++m)
-                    {
-                        for (int n = 0; n < data.Numbers.Length; ++n)
-                        {
-                            for (int o = 0; o < data.Numbers.Length; ++o)
-                            {
-                                for (int k = 0; k < biggestRange; ++k)
-                                {
-                                    for (int l = 0; l < biggestRange; ++l)
-                                    {
-                                        for (int r = 0; r < biggestRange; ++r)
-                                        {
-                                            for (int s = 0; s < biggestRange; ++s)
-                                            {
-                                                RangeLookup(data, j, m, n, o, 255, 255, k, l, r, s, 255, 255);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else if (data.Numbers.Length == 3)
-            {
-                for (int j = 0; j < data.Numbers.Length; ++j)
-                {
-                    for (int m = 0; m < data.Numbers.Length; ++m)
-                    {
-                        for (int n = 0; n < data.Numbers.Length; ++n)
-                        {
-                            for (int k = 0; k < biggestRange; ++k)
-                            {
-                                for (int l = 0; l < biggestRange; ++l)
-                                {
-                                    for (int r = 0; r < biggestRange; ++r)
-                                    {
-                                        RangeLookup(data, j, m, n, 255, 255, 255, k, l, r, 255, 255, 255);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else if (data.Numbers.Length == 2)
-            {
-                for (int j = 0; j < data.Numbers.Length; ++j)
-                {
-                    for (int m = 0; m < data.Numbers.Length; ++m)
-                    {
-                        for (int k = 0; k < biggestRange; ++k)
-                        {
-                            for (int l = 0; l < biggestRange; ++l)
-                            {
-                                for (int r = 0; r < biggestRange; ++r)
-                                {
-                                    RangeLookup(data, j, m, 255, 255, 255, 255, k, l, 255, 255, 255, 255);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            int[] numbers = data.Numbers.ToArray();
+            (int, int)[] initialRanges = data.Ranges.ToArray();
+            HashSet<(int, int)> initialRangesFound = new();
+
+            biggestRange = initialRanges.Length;
+
+            GenerateCombinations(data, numbers, initialRanges, initialRangesFound, 0, biggestRange);
 
             Console.WriteLine($"Remaining: {--remaining}");
-        });
+        }
 
         // Count valid combinations.
         // Note the use of a string hash set as using a hash set of combined pairs appears to merge too aggressively.
@@ -410,6 +306,7 @@ static class Program
         }
 
         Console.WriteLine();
+        Console.WriteLine($"Time elapsed: {timer.Elapsed.Hours} Hours, {timer.Elapsed.Minutes} Minutes");
         Console.WriteLine($"Answer: {sumOfValidCombinations}");
     }
 }
