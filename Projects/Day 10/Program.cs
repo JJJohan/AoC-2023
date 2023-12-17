@@ -1,9 +1,10 @@
 ﻿using System.Diagnostics;
-using System.Drawing;
 using System.Text;
 
 static class Program
 {
+    private const bool OutputGridToDesktop = false;
+
     [Flags]
     private enum Directions
     {
@@ -75,7 +76,10 @@ static class Program
 
         // Build nodes
 
-        Node[][] nodes = new Node[lines.Length][];
+        int rows = lines.Length;
+        int cols = lines[0].Length;
+
+        Node[,] nodes = new Node[cols,rows];
         Node? start = null;
 
         int lineLength = lines[0].Length;
@@ -83,13 +87,12 @@ static class Program
         {
             string line = lines[i];
             Debug.Assert(line.Length == lineLength);
-            nodes[i] = new Node[line.Length];
 
             for (int j = 0; j < line.Length; ++j)
             {
                 char c = line[j];
 
-                nodes[i][j] = new Node
+                nodes[j,i] = new Node
                 {
                     X = j,
                     Y = i,
@@ -98,7 +101,7 @@ static class Program
 
                 if (c == 'S')
                 {
-                    start = nodes[i][j];
+                    start = nodes[j,i];
                 }
             }
         }
@@ -117,7 +120,7 @@ static class Program
 
             if (node.Directions.HasFlag(Directions.Left) && node.X > 0)
             {
-                Node nextNode = nodes[node.Y][node.X - 1];
+                Node nextNode = nodes[node.X - 1, node.Y];
                 if (nextNode.Directions.HasFlag(Directions.Right))
                 {
                     if (nextNode.Value == 0)
@@ -129,7 +132,7 @@ static class Program
             }
             if (node.Directions.HasFlag(Directions.Right) && node.X < lineLength)
             {
-                Node nextNode = nodes[node.Y][node.X + 1];
+                Node nextNode = nodes[node.X + 1, node.Y];
                 if (nextNode.Directions.HasFlag(Directions.Left))
                 {
                     if (nextNode.Value == 0)
@@ -141,7 +144,7 @@ static class Program
             }
             if (node.Directions.HasFlag(Directions.Up) && node.Y > 0)
             {
-                Node nextNode = nodes[node.Y - 1][node.X];
+                Node nextNode = nodes[node.X, node.Y - 1];
                 if (nextNode.Directions.HasFlag(Directions.Down))
                 {
                     if (nextNode.Value == 0)
@@ -153,7 +156,7 @@ static class Program
             }
             if (node.Directions.HasFlag(Directions.Down) && node.Y < lines.Length)
             {
-                Node nextNode = nodes[node.Y + 1][node.X];
+                Node nextNode = nodes[node.X, node.Y + 1];
                 if (nextNode.Directions.HasFlag(Directions.Up))
                 {
                     if (nextNode.Value == 0)
@@ -178,7 +181,7 @@ static class Program
 
             if (node.Directions.HasFlag(Directions.Left) && node.X > 0)
             {
-                Node nextNode = nodes[node.Y][node.X - 1];
+                Node nextNode = nodes[node.X - 1, node.Y];
                 if (nextNode.Directions.HasFlag(Directions.Right))
                 {
                     if (nextNode.Next != node)
@@ -194,7 +197,7 @@ static class Program
             }
             if (node.Directions.HasFlag(Directions.Right) && node.X < lineLength)
             {
-                Node nextNode = nodes[node.Y][node.X + 1];
+                Node nextNode = nodes[node.X + 1, node.Y];
                 if (nextNode.Directions.HasFlag(Directions.Left))
                 {
                     if (nextNode.Next != node)
@@ -210,7 +213,7 @@ static class Program
             }
             if (node.Directions.HasFlag(Directions.Up) && node.Y > 0)
             {
-                Node nextNode = nodes[node.Y - 1][node.X];
+                Node nextNode = nodes[node.X, node.Y - 1];
                 if (nextNode.Directions.HasFlag(Directions.Down))
                 {
                     if (nextNode.Next != node)
@@ -226,7 +229,7 @@ static class Program
             }
             if (node.Directions.HasFlag(Directions.Down) && node.Y < lines.Length)
             {
-                Node nextNode = nodes[node.Y + 1][node.X];
+                Node nextNode = nodes[node.X, node.Y + 1];
                 if (nextNode.Directions.HasFlag(Directions.Up))
                 {
                     if (nextNode.Next != node)
@@ -243,24 +246,14 @@ static class Program
             }
         }
 
-        int rows = lineLength;
-        int cols = lines.Length;
-
+        List<Node> loopNodes = new();
         Node? prev = start.Previous;
+        loopNodes.Add(start);
         while (prev != null && prev != start)
         {
+            loopNodes.Add(prev);
             prev.LoopNode = true;
             prev = prev.Previous;
-        }
-
-        List<Node> loopNodes = [start];
-        for (int y = 0; y < rows; ++y)
-        {
-            for (int x = 0; x < cols; ++x)
-            {
-                Node node = nodes[y][x];
-                if (node.LoopNode) loopNodes.Add(node);
-            }
         }
 
         int totalInside = 0;
@@ -268,7 +261,7 @@ static class Program
         {
             for (int y = 0; y < rows; ++y)
         {
-                Node node = nodes[y][x];
+                Node node = nodes[x, y];
                 if (!node.LoopNode && IsPointInPolygon(loopNodes, node))
                 {
                     node.InsideLoop = true;
@@ -277,60 +270,64 @@ static class Program
             }
         }
 
-        StringBuilder sb = new();
-        for (int y = 0; y < rows; ++y)
+        // Printing output to text file - useful for debugging.
+        if (OutputGridToDesktop)
         {
-            for (int x = 0; x < cols; ++x)
+            StringBuilder sb = new();
+            for (int y = 0; y < rows; ++y)
             {
-                Node node = nodes[y][x];
-                if (node.LoopNode)
+                for (int x = 0; x < cols; ++x)
                 {
-                    if (node.Directions.HasFlag(Directions.Up))
+                    Node node = nodes[x, y];
+                    if (node.LoopNode)
                     {
-                        if (node.Directions.HasFlag(Directions.Down))
+                        if (node.Directions.HasFlag(Directions.Up))
                         {
-                            sb.Append('|');
+                            if (node.Directions.HasFlag(Directions.Down))
+                            {
+                                sb.Append('|');
+                            }
+                            if (node.Directions.HasFlag(Directions.Left))
+                            {
+                                sb.Append('┘');
+                            }
+                            if (node.Directions.HasFlag(Directions.Right))
+                            {
+                                sb.Append('└');
+                            }
                         }
-                        if (node.Directions.HasFlag(Directions.Left))
+                        else if (node.Directions.HasFlag(Directions.Down))
                         {
-                            sb.Append('┘');
+                            if (node.Directions.HasFlag(Directions.Left))
+                            {
+                                sb.Append('┐');
+                            }
+                            if (node.Directions.HasFlag(Directions.Right))
+                            {
+                                sb.Append('┌');
+                            }
                         }
-                        if (node.Directions.HasFlag(Directions.Right))
+                        else if (node.Directions.HasFlag(Directions.Left) && node.Directions.HasFlag(Directions.Right))
                         {
-                            sb.Append('└');
+                            sb.Append('─');
                         }
                     }
-                    else if (node.Directions.HasFlag(Directions.Down))
+                    else if (node.InsideLoop)
                     {
-                        if (node.Directions.HasFlag(Directions.Left))
-                        {
-                            sb.Append('┐');
-                        }
-                        if (node.Directions.HasFlag(Directions.Right))
-                        {
-                            sb.Append('┌');
-                        }
+                        sb.Append('I');
                     }
-                    else if (node.Directions.HasFlag(Directions.Left) && node.Directions.HasFlag(Directions.Right))
+                    else
                     {
-                        sb.Append('─');
-                    }
-                }
-                else if (node.InsideLoop)
-                {
-                    sb.Append('I');
-                }
-                else
-                {
 
-                    sb.Append(' ');
+                        sb.Append(' ');
+                    }
                 }
+                sb.AppendLine();
             }
-            sb.AppendLine();
-        }
 
-        string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        File.WriteAllText(Path.Combine(desktop, "test.txt"), sb.ToString());
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            File.WriteAllText(Path.Combine(desktop, "test.txt"), sb.ToString());
+        }
 
         Console.WriteLine($"Total cells inside: {totalInside}");
     }
