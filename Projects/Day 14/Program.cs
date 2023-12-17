@@ -1,12 +1,12 @@
 ﻿using System.Diagnostics;
-
+using System.Text;
 static class Program
 {
     private enum Type
     {
-        Empty,
-        Fixed,
-        Round
+        Empty = '.',
+        Fixed = '#',
+        Round = 'O'
     }
 
     private struct Table
@@ -23,6 +23,49 @@ static class Program
         'O' => Type.Round,
         _ => throw new InvalidOperationException()
     };
+
+    private static string GridToString(Type[][] grid)
+    {
+        StringBuilder sb = new();
+        for (int i = 0; i < grid.Length; ++i)
+        {
+            Type[] row = grid[i];
+            for (int j = 0; j < row.Length; ++j)
+            {
+                sb.Append((char)row[j]);
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static long ComputeLoad(in Table table, Type[][] grid)
+    {
+        long load = 0;
+        for (int y = 0; y < table.Rows; ++y)
+        {
+            for (int x = 0; x < table.Cols; ++x)
+            {
+                if (grid[y][x] == Type.Round)
+                {
+                    load += table.Rows - y;
+                }
+            }
+        }
+
+        return load;
+    }
+
+    private static bool Match(string state, string[] prevStates)
+    {
+        for (int i = 0; i < prevStates.Length; ++i)
+        {
+            if (state == prevStates[i])
+                return true;
+        }
+
+        return false;
+    }
 
     public static void Main()
     {
@@ -74,159 +117,138 @@ static class Program
         }
 
         // Compute the load
-        long load = 0;
-        for (int y = 0; y < table.Rows; ++y)
-        {
-            for (int x = 0; x < table.Cols; ++x)
-            {
-                if (table.Grid[y][x] == Type.Round)
-                {
-                    load += table.Rows - y;
-                }
-            }
-        }
+        long load = ComputeLoad(table, table.Grid);
 
         Console.WriteLine($"Answer: {load}");
 
         // Part 2
 
         // Perform 1 billion cycles
-        Stopwatch timer = Stopwatch.StartNew();
         int rowMin1 = table.Rows - 1;
         int colMin1 = table.Cols - 1;
 
-        unchecked
+        HashSet<string> gridCache = new();
+        string loopStart = string.Empty;
+        int loopStartIdx = 0;
+        int loopLength = 0;
+        for (int i = 0; i < 1_000_000_000; ++i)
         {
-            for (int i = 0; i < 1_000_000_000; ++i)
-            {
-                // North
-                for (int x = 0; x < table.Cols; ++x)
-                {
-                    for (int y = 1; y < gridCopy.Length; ++y)
-                    {
-                        Type[] row = gridCopy[y];
-                        if (row[x] == Type.Round)
-                        {
-                            int currentRow = y;
-                            while (currentRow > 0 && gridCopy[currentRow - 1][x] == Type.Empty)
-                            {
-                                --currentRow;
-                            }
-
-                            if (currentRow != y)
-                            {
-                                gridCopy[currentRow][x] = Type.Round;
-                                row[x] = Type.Empty;
-                            }
-                        }
-                    }
-                }
-
-                // West
-                for (int y = 0; y < gridCopy.Length; ++y)
-                {
-                    Type[] row = gridCopy[y];
-                    for (int x = 1; x < row.Length; ++x)
-                    {
-                        if (row[x] == Type.Round)
-                        {
-                            int currentCol = x;
-                            while (currentCol > 0 && row[currentCol - 1] == Type.Empty)
-                            {
-                                --currentCol;
-                            }
-
-                            if (currentCol != x)
-                            {
-                                row[currentCol] = Type.Round;
-                                row[x] = Type.Empty;
-                            }
-                        }
-                    }
-                }
-
-                // South
-                for (int x = 0; x < table.Cols; ++x)
-                {
-                    for (int y = table.Rows - 2; y >= 0; --y)
-                    {
-                        Type[] row = gridCopy[y];
-                        if (row[x] == Type.Round)
-                        {
-                            int currentRow = y;
-                            while (currentRow < rowMin1 && gridCopy[currentRow + 1][x] == Type.Empty)
-                            {
-                                ++currentRow;
-                            }
-
-                            if (currentRow != y)
-                            {
-                                gridCopy[currentRow][x] = Type.Round;
-                                row[x] = Type.Empty;
-                            }
-                        }
-                    }
-                }
-
-                // East
-                for (int y = 0; y < gridCopy.Length; ++y)
-                {
-                    Type[] row = gridCopy[y];
-                    for (int x = table.Cols - 2; x >= 0; --x)
-                    {
-                        if (row[x] == Type.Round)
-                        {
-                            int currentCol = x;
-                            while (currentCol < colMin1 && row[currentCol + 1] == Type.Empty)
-                            {
-                                ++currentCol;
-                            }
-
-                            if (currentCol != x)
-                            {
-                                row[currentCol] = Type.Round;
-                                row[x] = Type.Empty;
-                            }
-                        }
-                    }
-                }
-
-                if (i % 1_000_000 == 0)
-                {
-                    int remaining = 1_000_000_000 - i;
-                    double timePerIteration = (double)timer.ElapsedMilliseconds / i;
-                    timePerIteration *= remaining;
-
-                    double seconds = timePerIteration / 1000;
-                    double minutes = seconds / 60;
-                    int hours = (int)minutes / 60;
-                    int secondsRemaining = (int)(seconds % 60);
-                    int minutesRemaining = (int)(minutes % 60);
-                    if (i != 0)
-                    {
-                        (int left, int top) = Console.GetCursorPosition();
-                        Console.SetCursorPosition(left, top - 1);
-                    }
-
-                    Console.WriteLine($"ETA: {hours}:{minutesRemaining:00}:{secondsRemaining:00} ({remaining} remaining)");
-                }
-            }
-        }
-
-        // Compute the load
-        load = 0;
-        for (int y = 0; y < table.Rows; ++y)
-        {
+            // North
             for (int x = 0; x < table.Cols; ++x)
             {
-                if (gridCopy[y][x] == Type.Round)
+                for (int y = 1; y < gridCopy.Length; ++y)
                 {
-                    load += table.Rows - y;
+                    Type[] row = gridCopy[y];
+                    if (row[x] == Type.Round)
+                    {
+                        int currentRow = y;
+                        while (currentRow > 0 && gridCopy[currentRow - 1][x] == Type.Empty)
+                        {
+                            --currentRow;
+                        }
+
+                        if (currentRow != y)
+                        {
+                            gridCopy[currentRow][x] = Type.Round;
+                            row[x] = Type.Empty;
+                        }
+                    }
                 }
+            }
+
+            // West
+            for (int y = 0; y < gridCopy.Length; ++y)
+            {
+                Type[] row = gridCopy[y];
+                for (int x = 1; x < row.Length; ++x)
+                {
+                    if (row[x] == Type.Round)
+                    {
+                        int currentCol = x;
+                        while (currentCol > 0 && row[currentCol - 1] == Type.Empty)
+                        {
+                            --currentCol;
+                        }
+
+                        if (currentCol != x)
+                        {
+                            row[currentCol] = Type.Round;
+                            row[x] = Type.Empty;
+                        }
+                    }
+                }
+            }
+
+            // South
+            for (int x = 0; x < table.Cols; ++x)
+            {
+                for (int y = table.Rows - 2; y >= 0; --y)
+                {
+                    Type[] row = gridCopy[y];
+                    if (row[x] == Type.Round)
+                    {
+                        int currentRow = y;
+                        while (currentRow < rowMin1 && gridCopy[currentRow + 1][x] == Type.Empty)
+                        {
+                            ++currentRow;
+                        }
+
+                        if (currentRow != y)
+                        {
+                            gridCopy[currentRow][x] = Type.Round;
+                            row[x] = Type.Empty;
+                        }
+                    }
+                }
+            }
+
+            // East
+            for (int y = 0; y < gridCopy.Length; ++y)
+            {
+                Type[] row = gridCopy[y];
+                for (int x = table.Cols - 2; x >= 0; --x)
+                {
+                    if (row[x] == Type.Round)
+                    {
+                        int currentCol = x;
+                        while (currentCol < colMin1 && row[currentCol + 1] == Type.Empty)
+                        {
+                            ++currentCol;
+                        }
+
+                        if (currentCol != x)
+                        {
+                            row[currentCol] = Type.Round;
+                            row[x] = Type.Empty;
+                        }
+                    }
+                }
+            }
+
+            if (loopLength == 0)
+            {
+                string gridState = GridToString(gridCopy);
+                if (gridCache.Contains(gridState))
+                {
+                    // Admittedly I took the modulus solution from Reddit - otherwise I got pretty close but didn't want my answer to be a magic offset.
+                    if (gridState == loopStart)
+                    {
+                        loopLength = i - loopStartIdx;
+                        i = 1_000_000_000 - ((1_000_000_000 - i) % loopLength);
+                    }
+                    else if (loopStart == string.Empty)
+                    {
+                        loopStart = gridState;
+                        loopStartIdx = i;
+                    }
+                }
+
+                gridCache.Add(gridState);
             }
         }
 
+        load = ComputeLoad(table, gridCopy);
+
         Console.WriteLine($"Answer: {load}");
-        Console.ReadLine();
     }
 }
