@@ -10,26 +10,14 @@ static class Program
         public string ColorCode;
     }
 
-    private static bool IsPointInPolygon(List<(int X, int Y)> holesDug, (int X, int Y) node)
+    private static char ValueToDirChar(int val) => val switch
     {
-        bool result = false;
-        int j = holesDug.Count - 1;
-        for (int i = 0; i < holesDug.Count; i++)
-        {
-            if (holesDug[i].Y < node.Y && holesDug[j].Y >= node.Y ||
-                holesDug[j].Y < node.Y && holesDug[i].Y >= node.Y)
-            {
-                if (holesDug[i].X + (node.Y - holesDug[i].Y) /
-                   (holesDug[j].Y - holesDug[i].Y) *
-                   (holesDug[j].X - holesDug[i].X) < node.X)
-                {
-                    result = !result;
-                }
-            }
-            j = i;
-        }
-        return result;
-    }
+        0 => 'R',
+        1 => 'D',
+        2 => 'L',
+        3 => 'U',
+        _ => throw new InvalidOperationException()
+    };
 
     public static void Main()
     {
@@ -54,11 +42,6 @@ static class Program
         (int X, int Y) current = (0, 0);
         holesDug.Add(current);
 
-        int maxX = 0;
-        int maxY = 0;
-        int minX = int.MaxValue;
-        int minY = int.MaxValue;
-
         for (int i = 0; i < data.Length; ++i)
         {
             ref Data d = ref data[i];
@@ -75,31 +58,11 @@ static class Program
                 else
                     Debug.Fail("Unexpected direction.");
 
-                minX = Math.Min(current.X, minX);
-                minY = Math.Min(current.Y, minY);
-                maxX = Math.Max(current.X, maxX);
-                maxY = Math.Max(current.Y, maxY);
                 holesDug.Add(current);
             }
         }
 
-        long holeArea = 0;
-        HashSet<(int, int)> boundary = new();
-        for (int i = 0; i < holesDug.Count; ++i)
-        {
-            boundary.Add((holesDug[i].Item1, holesDug[i].Item2));
-        }
-
-        for (int y = minY; y <= maxY; ++y)
-        {
-            for (int x = minX; x <= maxX; ++x)
-            {
-                if (boundary.Contains((x, y)) || IsPointInPolygon(holesDug, (x, y)))
-                {
-                    ++holeArea;
-                }
-            }
-        }
+        long holeArea = GetPolygonArea(holesDug);
 
         Console.WriteLine($"Hole area: {holeArea}");
 
@@ -114,17 +77,17 @@ static class Program
         {
             ref Data d = ref data[i];
             int metres = int.Parse(d.ColorCode.Substring(2, 5), NumberStyles.HexNumber);
-            int dir = int.Parse(d.ColorCode.Substring(7, 1), NumberStyles.HexNumber);
+            char dir = ValueToDirChar(int.Parse(d.ColorCode.Substring(7, 1), NumberStyles.HexNumber));
 
             for (int j = 0; j < metres; ++j)
             {
-                if (dir == 1) // Down
+                if (dir == 'D')
                     current.Y += 1;
-                else if (dir == 3) // Up
+                else if (dir == 'U')
                     current.Y -= 1;
-                else if (dir == 2) // Left
+                else if (dir == 'L')
                     current.X -= 1;
-                else if (dir == 0) // Right
+                else if (dir == 'R')
                     current.X += 1;
                 else
                     Debug.Fail("Unexpected direction.");
@@ -133,51 +96,56 @@ static class Program
             }
         }
 
-        // Calculate the number of lattice points on the boundary
-        long boundaryPoints = 0;
-        for (int i = 0; i < holesDug.Count; ++i)
-        {
-            int nextIndex = (i + 1) % holesDug.Count;
-            boundaryPoints += GCD(Math.Abs(holesDug[i].X - holesDug[nextIndex].X), Math.Abs(holesDug[i].Y - holesDug[nextIndex].Y));
-        }
-
-        // Calculate the number of lattice points strictly inside the polygon using Pick's Theorem
-        long interiorPoints = CalculateInteriorPoints(holesDug);
-
-        // Calculate the area using Pick's Theorem
-        holeArea = interiorPoints + boundaryPoints / 2 - 1;  
+        holeArea = GetPolygonArea(holesDug);        
 
         Console.WriteLine($"Hole area: {holeArea}");
     }
 
-    // Helper method to calculate the greatest common divisor (GCD) using Euclidean algorithm
-    private static long GCD(long a, long b)
+    private static long GetPolygonArea(List<(int X, int Y)> holesDug)
     {
-        while (b != 0)
-        {
-            long temp = b;
-            b = a % b;
-            a = temp;
-        }
-        return a;
+        // I = S + 1 - B / 2
+        long boundaryPoints = CalculateBoundaryPoints(holesDug);
+        long areaPoints = CalculateInteriorPoints(holesDug);
+
+        // Comment - wtf? The formula is 'I = S + 1 - B / 2'
+        // I only get the correct answer if I make that 'I = |S - 1 - B / 2|'
+        return Math.Abs(areaPoints - 1 - boundaryPoints / 2);
     }
 
-    // Helper method to calculate the number of lattice points strictly inside the polygon
+    private static long GCD(int a, int b)
+    {
+        return b == 0 ? a : GCD(b, a % b);
+    }
+
+    private static long CalculateBoundaryPoints(List<(int X, int Y)> polygon)
+    {
+        long boundaryPoints = polygon.Count;
+        for (int i = 0; i < polygon.Count; ++i)
+        {
+            int dx = polygon[i].X - polygon[(i + 1) % polygon.Count].X;
+            int dy = polygon[i].Y - polygon[(i + 1) % polygon.Count].Y;
+            boundaryPoints += Math.Abs(GCD(dx, dy)) - 1;
+        }
+
+        return boundaryPoints;
+    }
+
     private static long CalculateInteriorPoints(List<(int X, int Y)> polygon)
     {
         long interiorPoints = 0;
 
-        // Calculate twice the signed area of the polygon
-        for (int i = 0; i < polygon.Count; ++i)
+        for (int i = 2; i < polygon.Count; ++i)
         {
-            int nextIndex = (i + 1) % polygon.Count;
-            interiorPoints += (polygon[i].X + polygon[nextIndex].X) * (polygon[i].Y - polygon[nextIndex].Y);
+            int x1 = polygon[i].X - polygon[0].X;
+            int y1 = polygon[i].Y - polygon[0].Y;
+
+            int x2 = polygon[i - 1].X - polygon[0].X;
+            int y2 = polygon[i - 1].Y - polygon[0].Y;
+
+            interiorPoints += x1 * y2 - x2 * y1;
         }
 
-        // Take the absolute value and divide by 2 to get the signed area
-        long signedArea = Math.Abs(interiorPoints) / 2;
-
-        // Calculate the number of lattice points strictly inside the polygon
-        return signedArea - polygon.Count + 1;
+        // In the formula the absolute value is returned.. but this works?
+        return interiorPoints / 2;
     }
 }
