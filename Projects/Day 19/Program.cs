@@ -1,12 +1,11 @@
 ﻿using System.Diagnostics;
-using static System.Net.Mime.MediaTypeNames;
 
 static class Program
 {
     private class Rule
     {
         public string DefaultNext;
-        public List<(char, int, char, string)> Rules;
+        public List<(byte, int, char, string)> Rules;
 
         public Rule()
         {
@@ -17,8 +16,17 @@ static class Program
 
     private struct Input
     {
-        public Dictionary<char, int> Values;
+        public int[] Values;
     }
+
+    private static byte CharToIndex(char c) => c switch
+    {
+        'x' => 0,
+        'm' => 1,
+        'a' => 2,
+        's' => 3,
+        _ => throw new InvalidOperationException()
+    };
 
     public static void Main()
     {
@@ -59,7 +67,7 @@ static class Program
                     char letter = bits[0][0];
                     char condition = bits[0][1];
                     int value = int.Parse(bits[0].Substring(2));
-                    rule.Rules.Add((letter, value, condition, bits[1]));
+                    rule.Rules.Add((CharToIndex(letter), value, condition, bits[1]));
                 }
             }
 
@@ -77,12 +85,12 @@ static class Program
             line = line.Substring(1, line.Length - 2);
             string[] parts = line.Split(',');
             Debug.Assert(parts.Length == 4);
-            inputs[inputIndex].Values = new();
+            inputs[inputIndex].Values = new int[4];
             for (int i = 0; i < parts.Length; ++i)
             {
                 string[] varAndValue = parts[i].Split('=');
                 Debug.Assert(varAndValue.Length == 2);
-                inputs[inputIndex].Values[varAndValue[0][0]] = int.Parse(varAndValue[1]);
+                inputs[inputIndex].Values[i] = int.Parse(varAndValue[1]);
             }
             ++inputIndex;
             ++lineIndex;
@@ -101,20 +109,18 @@ static class Program
 
                 for (int j = 0; j < rule.Rules.Count; ++j)
                 {
-                    (char letter, int value, char condition, string next) = rule.Rules[j];
-                    if (input.Values.TryGetValue(letter, out int val))
+                    (byte index, int value, char condition, string next) = rule.Rules[j];
+
+                    visitedRules.Add(rule);
+                    if (condition == '<' && input.Values[index] < value)
                     {
-                        visitedRules.Add(rule);
-                        if (condition == '<' && val < value)
-                        {
-                            ruleName = next;
-                            break;
-                        }
-                        else if (condition == '>' && val > value)
-                        {
-                            ruleName = next;
-                            break;
-                        }
+                        ruleName = next;
+                        break;
+                    }
+                    else if (condition == '>' && input.Values[index] > value)
+                    {
+                        ruleName = next;
+                        break;
                     }
                 }
 
@@ -129,7 +135,7 @@ static class Program
         long sumOfValues = 0;
         for (int i = 0; i < accepted.Count; ++i)
         {
-            foreach (int val in accepted[i].Values.Values)
+            foreach (int val in accepted[i].Values)
             {
                 sumOfValues += val;
             }
@@ -138,49 +144,61 @@ static class Program
 
         // Part 2
 
-        long[] passes = new long[4];
-        for (int i = 0; i < 4000; ++i)
+        (int min, int max)[] combinations = new[]
         {
-            passes[i] += GetCombinations(rules, ('x', i), "in");
-            passes[i] += GetCombinations(rules, ('m', i), "in");
-            passes[i] += GetCombinations(rules, ('a', i), "in");
-            passes[i] += GetCombinations(rules, ('s', i), "in");
-        }   
+            (1, 4000),
+            (1, 4000),
+            (1, 4000),
+            (1, 4000)
+        };
 
-        long totalSum = passes[0] * passes[1] * passes[2] * passes[3];
+        long totalSum = GetCombinations(rules, combinations, "in");
+
         Console.WriteLine($"Max combinations: {totalSum}");
     }
 
-    private static long GetCombinations(Dictionary<string, Rule> rules, (char c, long v) combination, string currentRule)
+    private static long GetCombinations(Dictionary<string, Rule> rules, (int min, int max)[] combinations, string currentRule)
     {
+        for (int i = 0; i < combinations.Length; ++i)
+            if (combinations[i].max < combinations[i].min) return 0;
+
         if (currentRule == "R")
         {
             return 0;
         }
-
-        if (currentRule == "A")
+        else if (currentRule == "A")
         {
-            return 1;
-        }
-
-        Rule rule = rules[currentRule];
-
-        long sum = 0;
-        foreach ((char c, int value, char op, string next) in rule.Rules)
-        {
-            if (combination.c == c)
+            long sum = combinations[0].max - combinations[0].min + 1;
+            for (int i = 1; i < combinations.Length; ++i)
             {
-                if (op == '>' && combination.v > value)
+                sum *= (combinations[i].max - combinations[i].min + 1);
+            }
+            return sum;
+        }
+        else
+        {
+            Rule rule = rules[currentRule];
+            long sum = 0;
+
+            foreach ((byte index, int value, char op, string next) in rule.Rules)
+            {
+                if (op == '<')
                 {
-                    sum += GetCombinations(rules, combination, next);
+                    (int min, int max)[] newCombos = combinations.ToArray();
+                    newCombos[index].max = value - 1;
+                    sum += GetCombinations(rules, newCombos, next);
+                    combinations[index].min = value;
                 }
-                else if (op == '<' && combination.v < value)
+                else if (op == '>')
                 {
-                    sum += GetCombinations(rules, combination, next);
+                    (int min, int max)[] newCombos = combinations.ToArray();
+                    newCombos[index].min = value + 1;
+                    sum += GetCombinations(rules, newCombos, next);
+                    combinations[index].max = value;
                 }
             }
-        }
 
-        return sum + GetCombinations(rules, combination, rule.DefaultNext);
+            return sum += GetCombinations(rules, combinations, rule.DefaultNext);
+        }
     }
 }
