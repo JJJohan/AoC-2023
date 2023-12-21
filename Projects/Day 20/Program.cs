@@ -131,7 +131,7 @@ static class Program
                 else
                     ++lowPulseCount;
 
-                if (index == -1) 
+                if (index == -1)
                     continue;
 
                 Module module = moduleArray1[index];
@@ -240,14 +240,32 @@ static class Program
             }
         }
 
-        long buttonPresses = 0;
-        bool rxHit = false;
+        // Note this is a semi-hardcoded solution as we're looking for specific nodes.
+
+        long lkPulseStart = -1;
+        long zvPulseStart = -1;
+        long spPulseStart = -1;
+        long xtPulseStart = -1;
+
+        long lkPulseEnd = -1;
+        long zvPulseEnd = -1;
+        long spPulseEnd = -1;
+        long xtPulseEnd = -1;
+
+        int remaining = 8;
+
         broadcasterIndex = modulesClone["broadcaster"].Index;
+        int lkIndex = modulesClone["lk"].Index;
+        int zvIndex = modulesClone["zv"].Index;
+        int spIndex = modulesClone["sp"].Index;
+        int xtIndex = modulesClone["xt"].Index;
+
         Queue<(int last, int index, bool highPulse)> moduleCloneQueue = new();
-        while (!rxHit)
+        long buttonPresses = 0;
+        while (remaining > 0)
         {
-            moduleCloneQueue.Enqueue((-1, broadcasterIndex, false));
             ++buttonPresses;
+            moduleCloneQueue.Enqueue((-1, broadcasterIndex, false));
 
             while (moduleCloneQueue.Count > 0)
             {
@@ -255,15 +273,7 @@ static class Program
 
                 if (index == -1)
                 {
-                    if (!highPulse)
-                    {
-                        rxHit = true;
-                        break;
-                    }
-                    else
-                    {
-                        continue;
-                    }
+                    continue;
                 }
 
                 Module module = moduleArray[index];
@@ -307,6 +317,62 @@ static class Program
                                 }
                             }
 
+                            if (!allHigh)
+                            {
+                                if (index == lkIndex)
+                                {
+                                    if (lkPulseStart == -1)
+                                    {
+                                        lkPulseStart = buttonPresses;
+                                        --remaining;
+                                    }
+                                    else if (lkPulseEnd == -1)
+                                    {
+                                        lkPulseEnd = buttonPresses;
+                                        --remaining;
+                                    }
+                                }
+                                else if (index == zvIndex)
+                                {
+                                    if (zvPulseStart == -1)
+                                    {
+                                        zvPulseStart = buttonPresses;
+                                        --remaining;
+                                    }
+                                    else if (zvPulseEnd == -1)
+                                    {
+                                        zvPulseEnd = buttonPresses;
+                                        --remaining;
+                                    }
+                                }
+                                else if (index == spIndex)
+                                {
+                                    if (spPulseStart == -1)
+                                    {
+                                        spPulseStart = buttonPresses;
+                                        --remaining;
+                                    }
+                                    else if (spPulseEnd == -1)
+                                    {
+                                        spPulseEnd = buttonPresses;
+                                        --remaining;
+                                    }
+                                }
+                                else if (index == xtIndex)
+                                {
+                                    if (xtPulseStart == -1)
+                                    {
+                                        xtPulseStart = buttonPresses;
+                                        --remaining;
+                                    }
+                                    else if (xtPulseEnd == -1)
+                                    {
+                                        xtPulseEnd = buttonPresses;
+                                        --remaining;
+                                    }
+                                }
+                            }
+
                             foreach (int destIdx in module.DestinationIndices)
                             {
                                 moduleCloneQueue.Enqueue((index, destIdx, !allHigh));
@@ -326,6 +392,26 @@ static class Program
             }
         }
 
-        Console.WriteLine($"Minimum button presses for low pulse to rx: {buttonPresses}");
+        long[] ranges =
+        {
+            lkPulseEnd - lkPulseStart,
+            zvPulseEnd - zvPulseStart,
+            spPulseEnd - spPulseStart,
+            xtPulseEnd - xtPulseStart
+        };
+
+        // LCM
+        long lcm = ranges[0];
+        for (int i = 1; i < ranges.Length; ++i)
+        {
+            lcm = Math.Abs(lcm * ranges[i]) / GCD(lcm, ranges[i]);
+        }
+
+        Console.WriteLine($"Minimum button presses for low pulse to rx: {lcm}");
+    }
+
+    private static long GCD(long a, long b)
+    {
+        return b == 0 ? a : GCD(b, a % b);
     }
 }
